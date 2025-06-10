@@ -218,7 +218,7 @@ lassoMLE <- function(y, X, lambda = "lambda.min",
   lassoBeta <- lassoBeta * sdy
   conditionalBeta <- conditionalBeta * sdy
   lassoBeta <- lassoBeta / sdX[selected]
-  conidtionalBeta <- conditionalBeta / sdX[selected]
+  conditionalBeta <- conditionalBeta / sdX[selected]
   ysig <- ysig * sdy
   variance <- variance / sdy^2
   condSD <- sqrt(diag(coefVar))
