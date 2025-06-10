@@ -95,6 +95,10 @@ system.time(exact <- lassoMLE(y, X, lambda = "lambda.min",
                             method = "exact",
                             verbose = TRUE))
 
+# Number of optimisation iterations to treat as burn-in when
+# examining the solution path and coefficient samples.
+assumeConvergence <- 1000
+
 mle$conditionalBeta[1:5]
 mle$wald_CI[1:5, ]
 
