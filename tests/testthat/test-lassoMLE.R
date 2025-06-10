@@ -24,6 +24,16 @@ test_that("invalid method argument fails", {
     lassoMLE(y, X, lassoFit = fit, method = "bogus",
              optimSteps = 5, sampSteps = 5,
              delay = 1, verbose = FALSE),
-    "Method must be either exact or selected!"
+    "arg' should be one of"
+  )
+})
+
+test_that("dimension mismatch triggers error", {
+  X <- matrix(rnorm(20), 10, 2)
+  y <- rnorm(5)
+  expect_error(
+    lassoMLE(y, X, optimSteps = 1, sampSteps = 1,
+             delay = 1, verbose = FALSE),
+    "same number of rows"
   )
 })

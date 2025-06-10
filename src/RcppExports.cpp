@@ -48,7 +48,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // mvtSampler
-NumericVector mvtSampler(NumericVector y, NumericVector mu, IntegerVector selected, NumericMatrix threshold, NumericMatrix precision, int nsamp, int burnin, int trim, bool verbose);
+/**  * Gibbs sampler for a multivariate normal vector subject to  * coordinate-wise truncation.  The `selected` argument indicates which  * coordinates are truncated on one side only and which are bounded on  * both sides.  Samples are returned after an initial burn-in period and  * optional thinning.  */ NumericVector mvtSampler(NumericVector y, NumericVector mu, IntegerVector selected, NumericMatrix threshold, NumericMatrix precision, int nsamp, int burnin, int trim, bool verbose);
 RcppExport SEXP _selectiveMLE_mvtSampler(SEXP ySEXP, SEXP muSEXP, SEXP selectedSEXP, SEXP thresholdSEXP, SEXP precisionSEXP, SEXP nsampSEXP, SEXP burninSEXP, SEXP trimSEXP, SEXP verboseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;

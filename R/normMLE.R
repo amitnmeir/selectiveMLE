@@ -66,26 +66,10 @@ truncNormMLE <- function(y, sigma, threshold,
                          stepCoef = 1,
                          verbose = TRUE) {
   # Validating input -----------------
-  if(ncol(sigma) != nrow(sigma)) {
-    stop("sigma must be a symmetric matrix!")
-  }
+  validate_trunc_inputs(y, sigma, threshold)
 
   p <- length(y)
-  if(p != ncol(sigma)) {
-    stop("length of y must equal the dimension of sigma!")
-  }
-
-  if(length(threshold) == 1) {
-    threshold <- abs(threshold)
-    threshold <- cbind(rep(-threshold, p), rep(threshold, p))
-  } else if(length(threshold) == p) {
-    threshold <- cbind(-abs(threshold), abs(threshold))
-  } else if(all(dim(threshold) == c(p, 2))) {
-    threshold <- threshold
-  } else {
-    stop("threshold must be either a scalar, a vector of size length(y) or
-         a matrix of size length(y) X 2")
-  }
+  threshold <- expand_threshold(threshold, p)
 
   selected <- as.integer(as.vector((y < threshold[, 1]) | (y > threshold[, 2])))
   if(all(selected == 0)) {
