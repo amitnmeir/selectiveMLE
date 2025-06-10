@@ -12,3 +12,5 @@ LazyData: true
 LinkingTo: Rcpp, RcppArmadillo
 Imports: Rcpp, glmnet
 RoxygenNote: 6.0.1
+Suggests: knitr, rmarkdown, testthat
+VignetteBuilder: knitr
