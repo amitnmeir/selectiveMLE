@@ -1,5 +1,6 @@
 #include <Rcpp.h>
 #include <cmath>
+#include <algorithm>
 using namespace Rcpp;
 
 /*
@@ -130,15 +131,15 @@ void computeGradient_cpp(NumericVector gradient, NumericVector Xy,
                          double stepCoef, double stepRate,
                          double gradientBound,
                          int iter, int delay) {
-  stepCoef = stepCoef / std::pow(std::max(1, iter + 1 - delay), stepRate) ;
+  stepCoef = stepCoef / std::pow(std::max(1, iter + 1 - delay), stepRate);
   for(int i = 0 ; i < gradient.length() ; i++) {
     gradient[i] = Xy[i];
     for(int j = 0 ; j < XmX.ncol() ; j++) {
-      gradient[i] -= XmX(i, j) * samp[j] ;
+      gradient[i] -= XmX(i, j) * samp[j];
     }
-    gradient[i] *= stepCoef ;
+    gradient[i] *= stepCoef;
     if(std::abs(gradient[i]) > gradientBound) {
-      gradient[i] = gradientBound * sign_cpp(gradient[i]) ;
+      gradient[i] = gradientBound * sign_cpp(gradient[i]);
     }
   }
 }
