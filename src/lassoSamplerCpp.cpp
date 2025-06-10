@@ -29,6 +29,7 @@
 
 #include <Rcpp.h>
 #include <cmath>
+#include <algorithm>
 using namespace Rcpp;
 
 /*
@@ -279,10 +280,8 @@ double computeDiffThreshold(NumericVector signs,
 }
 
 /** Copy the contents of one numeric vector to another. */
-void copyVector(NumericVector to, NumericVector from) {
-  for(int i = 0 ; i < to.length() ; i++) {
-    to[i] = from[i] ;
-  }
+void copyVector(NumericVector &to, const NumericVector &from) {
+  std::copy(from.begin(), from.end(), to.begin());
 }
 
 /**
