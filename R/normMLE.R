@@ -3,7 +3,7 @@
 #' @description \code{truncNormMLE} computes the conditional MLE for subsets of
 #' mean vectors of multivariate normal distributions. Conditional estimates are
 #' computed via a stochastic gradient/contrastive divergence method and post-selection
-#' confidence intervals are computed based on the theoretical apporximate distribution
+#' confidence intervals are computed based on the theoretical approximate distribution
 #' of the conditional MLE.
 #'
 #' @param y the observed normal vector.
@@ -21,14 +21,10 @@
 #' @param stepRate number of optimization steps to take before decreasing
 #' the gradient step size.
 #'
-#' @param optimSteps number of stochastic gradient steps to take.
-#'
-#' @param sampSteps the rate at which to decrease the step size of the
-#' stochastic gradient.
 #'
 #' @param stepCoef fixed step size for stochastic gradient.
 #'
-#' @param verbose whether to report the progess of the optimization routine as
+#' @param verbose whether to report the progress of the optimization routine as
 #' it runs.
 #'
 #'

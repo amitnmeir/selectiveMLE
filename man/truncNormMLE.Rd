@@ -4,8 +4,16 @@
 \alias{truncNormMLE}
 \title{Maximum Likelihood Inference for Selected Normal Means}
 \usage{
-truncNormMLE(y, sigma, threshold, cialpha = 0.05, maxiter = 1000,
-  stepRate = 0.7, stepCoef = 1, verbose = TRUE)
+truncNormMLE(
+  y,
+  sigma,
+  threshold,
+  cialpha = 0.05,
+  maxiter = 1000,
+  stepRate = 0.7,
+  stepCoef = 1,
+  verbose = TRUE
+)
 }
 \arguments{
 \item{y}{the observed normal vector.}
@@ -25,13 +33,8 @@ the gradient step size.}
 
 \item{stepCoef}{fixed step size for stochastic gradient.}
 
-\item{verbose}{whether to report the progess of the optimization routine as
+\item{verbose}{whether to report the progress of the optimization routine as
 it runs.}
-
-\item{optimSteps}{number of stochastic gradient steps to take.}
-
-\item{sampSteps}{the rate at which to decrease the step size of the
-stochastic gradient.}
 }
 \value{
 \code{truncNormMLE} returns an object of class \code{truncNormMLE} which
@@ -51,7 +54,7 @@ stochastic gradient.}
 \code{truncNormMLE} computes the conditional MLE for subsets of
 mean vectors of multivariate normal distributions. Conditional estimates are
 computed via a stochastic gradient/contrastive divergence method and post-selection
-confidence intervals are computed based on the theoretical apporximate distribution
+confidence intervals are computed based on the theoretical approximate distribution
 of the conditional MLE.
 }
 \details{
