@@ -23,6 +23,16 @@ library(devtools)
 install_local("path/to/selectiveMLE")
 ```
 
+Alternatively, use the provided `Makefile`:
+
+```bash
+make install
+```
+
+This calls `R CMD INSTALL` after running `make clean`, which removes any
+compiled artifacts from previous builds. You can invoke `make clean` on its
+own to clear these files without installing the package.
+
 ## Quick example
 
 ```r
