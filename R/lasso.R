@@ -83,7 +83,7 @@
 #'
 
 lassoMLE <- function(y, X, lambda = "lambda.min",
-                      ysig = NULL,
+                     ysig = NULL,
                      lassoFit = NULL,
                      delay = 50,
                      optimSteps = 1000,
@@ -91,43 +91,29 @@ lassoMLE <- function(y, X, lambda = "lambda.min",
                      stepCoef = 0.001, stepRate = 0.85,
                      method = c("exact", "selected"),
                      verbose = TRUE) {
+
   assumeConvergence <- optimSteps
   iterations <- optimSteps + sampSteps
 
-  # Checking method ---------------
-  if(length(method) > 1) {
-    method <- method[1]
-  }
-  if(!(method %in% c("exact", "selected"))) {
-    stop("Method must be either exact or selected!")
-  }
-
+  method <- match.arg(method)
+  validate_lasso_inputs(y, X, method, lambda)
 
   # Standardizing variables ---------------
-  lambda <- "lambda.min"
-  sdy <- sd(y)
-  y <- y/sdy
-  meany <- mean(y)
-  y <- y - meany
+  std <- standardize_xy(y, X)
+  y <- std$y
+  X <- std$X
+  sdy <- std$sdy
+  meanX <- std$meanX
+  sdX <- std$sdX
   n <- length(y)
   p <- ncol(X)
-
-  meanX <- colMeans(X)
-  sdX <- apply(X, 2, sd)
-  for(i in 1:ncol(X)) X[, i] <- (X[, i] - meanX[i]) / sdX[i]
 
   # Getting the LASSO fit
   if(is.null(lassoFit)) {
     lassoFit <- cv.glmnet(X, y, standardize = FALSE, intercept = FALSE)
   }
 
-  if(lambda == "lambda.min") {
-    lambda <- lassoFit$lambda.min * n
-  } else if(lambda == "lambda.1se") {
-    lambda <- lassoFit$lambda.1se * n
-  } else {
-    lambda <- lambda
-  }
+  lambda <- compute_lambda(lassoFit, lambda, n)
 
   lassoBeta <- as.vector(coef(lassoFit, s = lambda / n))[-1]
   selected <- lassoBeta != 0
@@ -201,17 +187,11 @@ lassoMLE <- function(y, X, lambda = "lambda.min",
 
   conditionalBeta <- estimateMat[nrow(estimateMat), ]
 
-  #conditionalBeta <- pmin(abs(naiveBeta), pmax(0, conditionalBeta * sign(naiveBeta))) * sign(naiveBeta)
   ysig <- sd(Xm %*% conditionalBeta - y)
-  ysamp <- betaSample %*% XmX / ysig^2
-  forQuantiles <- ysamp[assumeConvergence:iterations, ] / sqrt(n)
-  center <- colMeans(forQuantiles)
-  variance <- var(forQuantiles)
-  coefVar <- solve(variance)
-  forQuantiles <- t(apply(forQuantiles, 1, function(x) x - center))
-  forQuantiles <- forQuantiles %*% coefVar
-  coefDistQuantiles <- t(apply(forQuantiles, 2, function(x) quantile(x, c(0.025, 0.975)))) /sqrt(n)
-  trueWald <- cbind(conditionalBeta - coefDistQuantiles[, 2], conditionalBeta - coefDistQuantiles[, 1])
+  wald <- compute_wald(betaSample, XmX, ysig, assumeConvergence, n, conditionalBeta)
+  trueWald <- wald$wald
+  coefVar <- wald$coefVar
+  variance <- wald$variance
  # roud(cbind(trueWald[, 1], naiveBeta, true, conditionalBeta, trueWald[, 2]), 3)
 
   # Rescaling parameters and computing intercepts
