@@ -2,7 +2,18 @@
 #include "mleHeader.h"
 using namespace Rcpp;
 
-
+/*
+ * normalSamplerCpp.cpp
+ *
+ * Implements a simple Gibbs sampler for multivariate normal vectors
+ * under coordinate-wise truncation.  This sampler is used by the
+ * `truncNormMLE` routine to approximate the selective MLE when the
+ * selection event is described by thresholding.
+ */
+/**
+ * Sample from a normal distribution truncated to the interval
+ * `[lower, upper]`.
+ */
 double sampleBoundedTruncNorm(double mu, double sd, double lower, double upper) {
   double u = runif(1)[0] ;
   double phiB = R::pnorm5(upper, mu, sd, 1, 0) ;
@@ -13,6 +24,13 @@ double sampleBoundedTruncNorm(double mu, double sd, double lower, double upper) 
 }
 
 // [[Rcpp::export]]
+/**
+ * Gibbs sampler for a multivariate normal vector subject to
+ * coordinate-wise truncation.  The `selected` argument indicates which
+ * coordinates are truncated on one side only and which are bounded on
+ * both sides.  Samples are returned after an initial burn-in period and
+ * optional thinning.
+ */
 NumericVector mvtSampler(NumericVector y,
                          NumericVector mu,
                          IntegerVector selected,

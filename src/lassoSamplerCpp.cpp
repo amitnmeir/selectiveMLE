@@ -2,9 +2,30 @@
 #include <cmath>
 using namespace Rcpp;
 
+/*
+ * lassoSamplerCpp.cpp
+ *
+ * This file implements the Metropolis--Hastings and Gibbs sampling
+ * routines used by the `lassoMLE` R function. The sampler generates
+ * draws from the conditional distribution of the refitted regression
+ * coefficients given that a particular lasso model was selected.  The
+ * samples are then used within a stochastic gradient procedure to
+ * approximate the selective maximum likelihood estimator described in
+ * Lee et al. (2016).  The code relies heavily on truncated normal
+ * proposals and coordinate-wise updates.
+ *
+ * All functions are designed to be called from R via Rcpp and assume
+ * column–major numeric vectors and matrices.
+ */
+
 # define M_PI           3.14159265358979323846  /* pi */
 const double log2pi = log(2.0 * 3.1415926535897932384);
 
+//
+// Utility routines -----------------------------------------------------------
+//
+
+/** Print the contents of a numeric vector to the R console. */
 void printVec(NumericVector x) {
   for(int i = 0; i < x.length() ; i ++) {
     Rcpp::Rcout<<x[i]<<" ";
@@ -12,12 +33,20 @@ void printVec(NumericVector x) {
   Rcpp::Rcout<<"\n" ;
 }
 
+/** Wrapper around `unif_rand` so it can be used with `std::random_shuffle`. */
 inline int randWrapper(const int n) { return floor(unif_rand()*n); }
 
+/** Randomly permute an integer vector in-place. */
 void randomShuffle(IntegerVector a) {
   std::random_shuffle(a.begin(), a.end(), randWrapper);
 }
 
+/**
+ * Sample from a one-sided truncated normal distribution when the
+ * truncation point is far in the tail. This routine uses an exponential
+ * proposal with acceptance--rejection to avoid numerical issues.
+ * The returned sample is on the original scale of the distribution.
+ */
 double sampleExtreme(double mu, double sd, double threshold) {
   double sign = 1 ;
   double proposal ;
@@ -46,6 +75,12 @@ double sampleExtreme(double mu, double sd, double threshold) {
   return proposal * sign;
 }
 
+/**
+ * Draw a sample from a univariate normal distribution truncated below
+ * at `threshold`.  When the truncation point is more than three
+ * standard deviations from the mean the sampler falls back to
+ * `sampleExtreme` for numerical stability.
+ */
 double sampleUnivTruncNorm(double mu, double sd, double threshold) {
   double u = runif(1)[0] ;
   double phiThreshold, sample ;
@@ -70,6 +105,13 @@ double sampleUnivTruncNorm(double mu, double sd, double threshold) {
   return sample ;
 }
 
+/**
+ * Compute the conditional mean of coordinate `index` in a multivariate
+ * normal random vector with mean `mu` and covariance proportional to the
+ * inverse of `XmX`.  The function assumes that the current sample is
+ * stored in `samp` and uses standard multivariate normal conditioning
+ * formulas.
+ */
 double computeConditionalMean(NumericVector mu,
                               NumericVector samp,
                               const NumericMatrix XmX,
@@ -88,6 +130,12 @@ double computeConditionalMean(NumericVector mu,
   return result ;
 }
 
+/**
+ * Check whether every element of `samp` lies between the
+ * corresponding lower `l` and upper `u` bounds.  Returns 1 if the
+ * condition holds and 0 otherwise.  Used to verify whether the current
+ * sample satisfies the zero-coordinate constraints.
+ */
 int innerZeroCondition(NumericVector samp,
                        const NumericVector l,
                        const NumericVector u) {
@@ -105,6 +153,11 @@ int innerZeroCondition(NumericVector samp,
   return count;
 }
 
+/**
+ * Determine whether the current sample of coefficients satisfies the
+ * one-step sampling constraints encoded in `threshold`.  Returns 1 if
+ * all coordinates are within the allowed region and 0 otherwise.
+ */
 int innerCheckOneCondition(NumericVector samp,
                            NumericVector threshold) {
   double x ;
@@ -118,6 +171,13 @@ int innerCheckOneCondition(NumericVector samp,
   return 1;
 }
 
+/**
+ * Compute the lower and upper bounds defining the selection region for
+ * the coordinates that were not selected by the lasso.  The matrix
+ * `u0mat` corresponds to the design matrix of inactive variables and
+ * `signs` gives the current sign configuration of the active
+ * coefficients.
+ */
 void computeZeroThresholds(const NumericMatrix u0mat,
                            NumericVector signs,
                            NumericVector l,
@@ -132,6 +192,12 @@ void computeZeroThresholds(const NumericMatrix u0mat,
   }
 }
 
+/**
+ * Compute the truncation thresholds used when sampling the active
+ * coefficients.  The thresholds depend on the current sign vector and
+ * the inverse design matrix `XmXinv` scaled by the lasso penalty
+ * `lambda`.
+ */
 void computeOneThreshold(NumericVector signs,
                          double lambda,
                          const NumericMatrix XmXinv,
@@ -145,6 +211,11 @@ void computeOneThreshold(NumericVector signs,
   }
 }
 
+/**
+ * Compute the change in the truncation threshold that would result from
+ * flipping the sign of a single coordinate.  This is used when
+ * proposing sign changes in the Metropolis--Hastings step.
+ */
 double computeDiffThreshold(NumericVector signs,
                             double lambda,
                             const NumericMatrix XmXinv,
@@ -161,12 +232,18 @@ double computeDiffThreshold(NumericVector signs,
   return result * lambda ;
 }
 
+/** Copy the contents of one numeric vector to another. */
 void copyVector(NumericVector to, NumericVector from) {
   for(int i = 0 ; i < to.length() ; i++) {
     to[i] = from[i] ;
   }
 }
 
+/**
+ * Gibbs sampler for the active coefficients.  Each coordinate is
+ * sampled from its full conditional truncated normal distribution given
+ * the remaining coefficients and the current sign configuration.
+ */
 void aOneSampler(NumericVector &samp,
                  const NumericVector &signs,
                  const NumericVector &u,
@@ -190,6 +267,11 @@ void aOneSampler(NumericVector &samp,
   }
 }
 
+/**
+ * Gibbs sampler for the variables that were not selected by the lasso.
+ * This function draws from a multivariate normal distribution subject
+ * to box constraints encoded in `lzero` and `uzero`.
+ */
 void zeroSampler(NumericVector &zsamp,
                  NumericVector &zeroSamp,
                  NumericVector zeroMean,
@@ -245,6 +327,9 @@ void zeroSampler(NumericVector &zsamp,
   }
 }
 
+/**
+ * Return the sign of `x` with a small tolerance around zero.
+ */
 double sign(double x) {
   double eps = 0.00000001 ;
   if(std::abs(x) < eps) {
@@ -256,6 +341,12 @@ double sign(double x) {
   }
 }
 
+/**
+ * Compute a stochastic gradient step for the selective likelihood.  The
+ * gradient is scaled by a decreasing step size controlled by
+ * `stepCoef`, `stepRate` and `delay` and is clipped to
+ * `gradientBound` to ensure stability.
+ */
 void computeGradient(NumericVector gradient, NumericVector Xy,
                      NumericVector samp, NumericMatrix XmX,
                      double stepCoef, double stepRate,
@@ -274,6 +365,11 @@ void computeGradient(NumericVector gradient, NumericVector Xy,
   }
 }
 
+/**
+ * Compute a running mean of the estimated coefficients over the last
+ * 300 iterations of the optimization.  The result is stored in
+ * `betaOut`.
+ */
 void computeConditionalBeta(NumericVector &betaOut,
                             const NumericMatrix &estimateMat,
                             int iter) {
@@ -290,6 +386,10 @@ void computeConditionalBeta(NumericVector &betaOut,
   }
 }
 
+/**
+ * Ensure that the coefficient estimates stay within the lasso
+ * constraint region defined by the naive solution.
+ */
 void boundBeta(NumericVector &estimate, NumericVector naive) {
   for(int i = 0 ; i < estimate.length() ; i++) {
     if(naive[i] < 0) {
@@ -308,6 +408,10 @@ void boundBeta(NumericVector &estimate, NumericVector naive) {
   }
 }
 
+/**
+ * Compute the log-density of a multivariate normal distribution with
+ * precision matrix `XmX / ysigsq` evaluated at `samp`.
+ */
 double mvtLogDens(NumericVector samp, NumericVector mean,
                   NumericMatrix XmX, double ysigsq) {
   NumericVector diff = NumericVector(samp.length()) ;
@@ -331,6 +435,12 @@ double mvtLogDens(NumericVector samp, NumericVector mean,
   return - 0.5 / ysigsq * result ;
 }
 
+/**
+ * Metropolis--Hastings update that proposes sign changes for the active
+ * coefficients and possibly resamples all coefficients if necessary.
+ * This step is responsible for exploring the truncated distribution
+ * defined by the lasso selection event.
+ */
 void mhSampler(NumericVector samp, NumericVector oldSamp,
                NumericVector signs, NumericVector newsigns,
                NumericVector mean, NumericMatrix &sigma,
@@ -451,6 +561,11 @@ void mhSampler(NumericVector samp, NumericVector oldSamp,
 }
 
 
+/**
+ * Main driver routine used by `lassoMLE`.  Runs a block Gibbs sampler
+ * combined with stochastic gradient updates in order to approximate the
+ * selective MLE for a lasso-selected model.
+ */
 // [[Rcpp::export]]
 void   lassoSampler(const NumericVector initEst,
                     const NumericVector initSamp,
