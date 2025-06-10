@@ -1,4 +1,5 @@
 #include <Rcpp.h>
+#include <cmath>
 using namespace Rcpp;
 
 # define M_PI           3.14159265358979323846  /* pi */
@@ -62,8 +63,8 @@ double sampleUnivTruncNorm(double mu, double sd, double threshold) {
   sample = R::qnorm5(u * phiThreshold, mu, sd, 1, 0) ;
 
   int tries = 0 ;
-  while(isnan(sample) & tries ++ < 10) {
-    sample =  sampleExtreme(mu, sd, threshold) ;
+  while(std::isnan(sample) && tries++ < 10) {
+    sample = sampleExtreme(mu, sd, threshold) ;
   }
 
   return sample ;
