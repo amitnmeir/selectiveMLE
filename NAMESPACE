@@ -3,4 +3,4 @@
 export(lassoMLE)
 export(truncNormMLE)
 importFrom(Rcpp,sourceCpp)
-useDynLib(selectiveMLE)
+useDynLib(selectiveMLE, .registration = TRUE)
