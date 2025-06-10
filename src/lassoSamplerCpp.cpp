@@ -620,7 +620,6 @@ void mhSampler(NumericVector samp, NumericVector oldSamp,
   }
 }
 
-
 /**
  * Main driver routine used by `lassoMLE`.  Runs a block Gibbs sampler
  * combined with stochastic gradient updates in order to approximate the
@@ -658,7 +657,7 @@ void mhSampler(NumericVector samp, NumericVector oldSamp,
  * @param methodExact Whether to perform exact polyhedral sampling.
  * @param verbose  If true, progress is printed to the console.
  */
-void   lassoSampler(const NumericVector initEst,
+NumericVector lassoSampler(const NumericVector initEst,
                     const NumericVector initSamp,
                     NumericMatrix oneCov, NumericMatrix XmX,
                     NumericMatrix XmXinv,
@@ -801,4 +800,5 @@ void   lassoSampler(const NumericVector initEst,
   if(verbose) {
     Rcpp::Rcout<<"\n" ;
   }
+  return samp;
 }
