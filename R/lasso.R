@@ -103,8 +103,7 @@ lassoMLE <- function(y, X, lambda = "lambda.min",
   }
 
 
-  # Standardizing variables ---------------
-  lambda <- "lambda.min"
+  # Standartizing variables ---------------
   sdy <- sd(y)
   y <- y/sdy
   meany <- mean(y)
