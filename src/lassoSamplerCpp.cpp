@@ -1,3 +1,32 @@
+/*
+ * lassoSamplerCpp.cpp
+ * --------------------
+ * This file houses the core C++ routines that power the MCMC based
+ * selective maximum likelihood estimator used by the `selectiveMLE`
+ * R package.  The implementation relies heavily on Rcpp in order to
+ * expose efficient sampling and optimisation code to the R environment.
+ *
+ * The main entry point is `lassoSampler` which performs a Gibbs style
+ * sampler combined with a stochastic optimisation step for estimating
+ * the conditional distribution of the lasso regression coefficients.
+ * To support this sampler a number of utilities are included:
+ *   - truncated normal sampling routines for both extreme and
+ *     near-boundary cases;
+ *   - convenience methods for shuffling, copying and simple linear
+ *     algebra calculations;
+ *   - routines for checking and enforcing polyhedral constraints
+ *     that arise in the lasso selection event;
+ *   - a Metropolis–Hastings step for updating the active signs of the
+ *     regression parameters; and
+ *   - helpers for computing gradients and bounding the optimisation
+ *     trajectory.
+ *
+ * All functions are written in plain C++ and make extensive use of the
+ * Rcpp API for vectorised operations and access to R’s random number
+ * generators.  None of the functions are exported directly to R except
+ * for `lassoSampler` which is registered via Rcpp attributes.
+ */
+
 #include <Rcpp.h>
 #include <cmath>
 using namespace Rcpp;
@@ -5,6 +34,11 @@ using namespace Rcpp;
 # define M_PI           3.14159265358979323846  /* pi */
 const double log2pi = log(2.0 * 3.1415926535897932384);
 
+/**
+ * Utility function used primarily for debugging.
+ * Prints the elements of a NumericVector to R's
+ * console separated by spaces.
+ */
 void printVec(NumericVector x) {
   for(int i = 0; i < x.length() ; i ++) {
     Rcpp::Rcout<<x[i]<<" ";
@@ -12,12 +46,29 @@ void printVec(NumericVector x) {
   Rcpp::Rcout<<"\n" ;
 }
 
+/**
+ * Wrapper for R's uniform RNG so that it can be
+ * supplied to std::random_shuffle.
+ */
 inline int randWrapper(const int n) { return floor(unif_rand()*n); }
 
+/**
+ * Randomly shuffles the elements of an integer vector
+ * in place using R's RNG state.
+ */
 void randomShuffle(IntegerVector a) {
   std::random_shuffle(a.begin(), a.end(), randWrapper);
 }
 
+/**
+ * Draws from a truncated normal distribution when the truncation
+ * point is far into the tail.  The method uses an exponential
+ * rejection sampler which is efficient for extreme values.
+ *
+ * @param mu        Mean of the normal distribution.
+ * @param sd        Standard deviation of the normal distribution.
+ * @param threshold Lower bound on the support of the distribution.
+ */
 double sampleExtreme(double mu, double sd, double threshold) {
   double sign = 1 ;
   double proposal ;
@@ -46,6 +97,15 @@ double sampleExtreme(double mu, double sd, double threshold) {
   return proposal * sign;
 }
 
+/**
+ * Sample from a univariate truncated normal distribution.  For moderate
+ * truncation the sample is obtained by inverting the CDF; for more
+ * extreme cases `sampleExtreme` is used as a fall back.
+ *
+ * @param mu        Mean of the normal distribution.
+ * @param sd        Standard deviation of the normal distribution.
+ * @param threshold Lower truncation point.
+ */
 double sampleUnivTruncNorm(double mu, double sd, double threshold) {
   double u = runif(1)[0] ;
   double phiThreshold, sample ;
@@ -70,6 +130,18 @@ double sampleUnivTruncNorm(double mu, double sd, double threshold) {
   return sample ;
 }
 
+/**
+ * Computes the conditional mean of one coordinate of a
+ * multivariate normal random vector given the remaining
+ * coordinates.  The covariance structure is provided via
+ * the matrix `XmX` and the residual variance `yvar`.
+ *
+ * @param mu    Vector of unconditional means.
+ * @param samp  Current state of the sampler.
+ * @param XmX   Scaled design cross product matrix.
+ * @param yvar  Residual variance (sigma^2).
+ * @param index Coordinate for which the mean is computed.
+ */
 double computeConditionalMean(NumericVector mu,
                               NumericVector samp,
                               const NumericMatrix XmX,
@@ -88,6 +160,11 @@ double computeConditionalMean(NumericVector mu,
   return result ;
 }
 
+/**
+ * Checks whether a sample lies within box constraints defined
+ * by `l` and `u`.  Used for validating draws from the zero part
+ * of the sampler.
+ */
 int innerZeroCondition(NumericVector samp,
                        const NumericVector l,
                        const NumericVector u) {
@@ -105,6 +182,11 @@ int innerZeroCondition(NumericVector samp,
   return count;
 }
 
+/**
+ * Tests if the current sample satisfies the sign constraints
+ * implied by the lasso model.  A zero return value indicates
+ * violation of the constraint.
+ */
 int innerCheckOneCondition(NumericVector samp,
                            NumericVector threshold) {
   double x ;
@@ -118,6 +200,12 @@ int innerCheckOneCondition(NumericVector samp,
   return 1;
 }
 
+/**
+ * Given a matrix representing constraints for the inactive set (u0mat)
+ * and a vector of signs for the active coefficients, compute the lower
+ * and upper bounds on the zero components.  These bounds define the
+ * polyhedral region in which the zero part of the response must lie.
+ */
 void computeZeroThresholds(const NumericMatrix u0mat,
                            NumericVector signs,
                            NumericVector l,
@@ -132,6 +220,11 @@ void computeZeroThresholds(const NumericMatrix u0mat,
   }
 }
 
+/**
+ * Compute thresholds for the active coordinates.  The thresholds
+ * correspond to the current signs and the lasso penalty `lambda` and
+ * are used when sampling the active regression coefficients.
+ */
 void computeOneThreshold(NumericVector signs,
                          double lambda,
                          const NumericMatrix XmXinv,
@@ -145,6 +238,11 @@ void computeOneThreshold(NumericVector signs,
   }
 }
 
+/**
+ * Threshold used when proposing a change of sign for a single
+ * coordinate.  Essentially computes the effect of flipping one
+ * sign while keeping the others fixed.
+ */
 double computeDiffThreshold(NumericVector signs,
                             double lambda,
                             const NumericMatrix XmXinv,
@@ -161,12 +259,28 @@ double computeDiffThreshold(NumericVector signs,
   return result * lambda ;
 }
 
+/** Simple helper that copies one NumericVector into another. */
 void copyVector(NumericVector to, NumericVector from) {
   for(int i = 0 ; i < to.length() ; i++) {
     to[i] = from[i] ;
   }
 }
 
+/**
+ * Gibbs updates for the active coefficients.
+ * Each coordinate is sampled from its truncated
+ * normal full conditional distribution.
+ *
+ * @param samp      Current coefficient vector (updated in place).
+ * @param signs     Sign vector of the active coefficients.
+ * @param u         Thresholds derived from the lasso penalty.
+ * @param mean      Conditional mean of the regression coefficients.
+ * @param XmX       Cross product matrix of the design.
+ * @param condSigma Conditional variances for each coefficient.
+ * @param ysigsq    Residual variance.
+ * @param burnin    Unused but kept for symmetry with R version.
+ * @param maxiter   Number of Gibbs sweeps to perform.
+ */
 void aOneSampler(NumericVector &samp,
                  const NumericVector &signs,
                  const NumericVector &u,
@@ -190,6 +304,12 @@ void aOneSampler(NumericVector &samp,
   }
 }
 
+/**
+ * Block Gibbs sampler for the components of Ay that correspond
+ * to inactive variables (the so called "zero" part).  Sampling
+ * is performed under box constraints using a truncated Gaussian
+ * proposal obtained via sequential univariate updates.
+ */
 void zeroSampler(NumericVector &zsamp,
                  NumericVector &zeroSamp,
                  NumericVector zeroMean,
@@ -245,6 +365,10 @@ void zeroSampler(NumericVector &zsamp,
   }
 }
 
+/**
+ * Utility to obtain the sign of a scalar with a small epsilon
+ * region around zero treated as exactly zero.
+ */
 double sign(double x) {
   double eps = 0.00000001 ;
   if(std::abs(x) < eps) {
@@ -256,6 +380,11 @@ double sign(double x) {
   }
 }
 
+/**
+ * Computes the stochastic gradient used to update the regression
+ * coefficients during the optimisation phase of the sampler.
+ * Step sizes are scaled according to `stepRate` and `delay`.
+ */
 void computeGradient(NumericVector gradient, NumericVector Xy,
                      NumericVector samp, NumericMatrix XmX,
                      double stepCoef, double stepRate,
@@ -274,6 +403,11 @@ void computeGradient(NumericVector gradient, NumericVector Xy,
   }
 }
 
+/**
+ * Forms a running mean of the estimated regression coefficients
+ * over the last few iterations.  This smooths out the Monte Carlo
+ * noise before final convergence is assumed.
+ */
 void computeConditionalBeta(NumericVector &betaOut,
                             const NumericMatrix &estimateMat,
                             int iter) {
@@ -290,6 +424,11 @@ void computeConditionalBeta(NumericVector &betaOut,
   }
 }
 
+/**
+ * Ensures that the optimiser stays within the box implied by the
+ * naive lasso solution.  Coefficients are clipped so that they do
+ * not cross zero or exceed the naive estimates in magnitude.
+ */
 void boundBeta(NumericVector &estimate, NumericVector naive) {
   for(int i = 0 ; i < estimate.length() ; i++) {
     if(naive[i] < 0) {
@@ -308,6 +447,11 @@ void boundBeta(NumericVector &estimate, NumericVector naive) {
   }
 }
 
+/**
+ * Evaluate the log-density of a multivariate normal distribution
+ * with covariance proportional to the inverse of `XmX`.
+ * This is used in the Metropolis-Hastings ratio for sign updates.
+ */
 double mvtLogDens(NumericVector samp, NumericVector mean,
                   NumericMatrix XmX, double ysigsq) {
   NumericVector diff = NumericVector(samp.length()) ;
@@ -331,6 +475,11 @@ double mvtLogDens(NumericVector samp, NumericVector mean,
   return - 0.5 / ysigsq * result ;
 }
 
+/**
+ * Performs Metropolis-Hastings updates of the active set signs.
+ * The proposal either flips a sign or jointly samples all active
+ * coefficients when the constraints are not satisfied.
+ */
 void mhSampler(NumericVector samp, NumericVector oldSamp,
                NumericVector signs, NumericVector newsigns,
                NumericVector mean, NumericMatrix &sigma,
@@ -452,6 +601,37 @@ void mhSampler(NumericVector samp, NumericVector oldSamp,
 
 
 // [[Rcpp::export]]
+/**
+ * Main workhorse implementing the selective MLE sampler for the
+ * lasso.  The function alternates between sampling the active set
+ * coefficients and performing stochastic gradient updates.  It is
+ * exposed to R via Rcpp and is not intended to be called directly
+ * by users.
+ *
+ * @param initEst  Initial estimate of the regression coefficients.
+ * @param initSamp Starting point for the sampler.
+ * @param oneCov   Conditional covariance matrix for the active set.
+ * @param XmX      Cross product of the design matrix.
+ * @param XmXinv   Inverse of XmX restricted to the active set.
+ * @param condSigma Conditional variances for each coefficient.
+ * @param lambda   Lasso penalty value.
+ * @param ysigsq   Residual variance.
+ * @param zeroMean Mean vector for the zero part of Ay.
+ * @param sqrtZero Square root of the covariance for the zero part.
+ * @param u0mat    Constraint matrix defining the selection event.
+ * @param n,p      Dimensions of the design matrix.
+ * @param nsamp    Number of Gibbs samples per outer iteration.
+ * @param burnin   Length of the burn-in period.
+ * @param Xy       Cross product of X and y.
+ * @param estimateMat Matrix to store estimates at each iteration.
+ * @param sampMat  Matrix to store sampler draws at each iteration.
+ * @param delay,stepRate,stepCoef Parameters controlling the optimiser.
+ * @param gradientBound Bound on the gradient magnitude.
+ * @param assumeConvergence Iteration at which optimisation stops.
+ * @param naive    Naive lasso estimate used for bounding.
+ * @param methodExact Whether to perform exact polyhedral sampling.
+ * @param verbose  If true, progress is printed to the console.
+ */
 void   lassoSampler(const NumericVector initEst,
                     const NumericVector initSamp,
                     NumericMatrix oneCov, NumericMatrix XmX,
