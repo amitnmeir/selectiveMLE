@@ -1,0 +1,71 @@
+---
+title: "Introduction to selectiveMLE"
+output:
+  rmarkdown::github_document
+vignette: >
+  %\VignetteIndexEntry{Introduction to selectiveMLE}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+`selectiveMLE` provides tools for conditional maximum likelihood inference
+when a model has been chosen using the lasso or via thresholding of normal
+means.
+
+This vignette demonstrates basic usage of the two exported functions
+`lassoMLE()` and `truncNormMLE()`.
+
+## Lasso example
+
+The code below follows the small simulation from the README.  We generate a
+matrix of predictors and a response vector, fit a lasso model and then obtain
+the conditional MLE for the selected coefficients.
+
+```{r lasso, message=FALSE}
+library(selectiveMLE)
+set.seed(123)
+X <- matrix(rnorm(100 * 10), 100, 10)
+beta <- c(2, -1.5, rep(0, 8))
+y <- as.numeric(X %*% beta + rnorm(100))
+
+fit <- lassoMLE(y, X, lambda = "lambda.min", optimSteps = 200,
+                sampSteps = 400, verbose = FALSE)
+fit$conditionalBeta
+fit$wald_CI
+sol <- data.frame(iter = seq_len(nrow(fit$solution_path)),
+                  fit$solution_path)
+sol_long <- tidyr::pivot_longer(sol, -iter,
+                                names_to = "variable",
+                                values_to = "estimate")
+ggplot(sol_long, aes(iter, estimate, colour = variable)) +
+  geom_line() +
+  geom_hline(yintercept = 0, linetype = 2) +
+  theme_bw()
+
+knitr::kable(fit$wald_CI, col.names = c("lower", "upper"), digits = 2)
+```
+
+## Selected normal means
+
+The package also handles inference for truncated normal observations via
+`truncNormMLE()`.  Here we generate a small example and compute the MLE
+for coordinates that cross a threshold of one.
+
+```{r mvtnorm, message=FALSE}
+sigma <- diag(5)
+y <- rnorm(5, mean = 0, sd = 1.5)
+res <- truncNormMLE(y, sigma, threshold = 1,
+                    maxiter = 300, verbose = FALSE)
+res$mle
+res$CI
+barplot(rbind(observed = y, mle = res$mle), beside = TRUE,
+        legend.text = TRUE, ylab = "value")
+```
+
+More elaborate demonstrations can be found in the scripts
+`lassoMLE example script.R` and `mvtnorm example script.R` located in the
+repository root.
