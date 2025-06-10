@@ -2,6 +2,15 @@
 #include <cmath>
 using namespace Rcpp;
 
+/*
+ * Wrappers for sampler utility functions used in the C++ implementation of
+ * the lasso sampler. The original functions are defined in
+ * `src/lassoSamplerCpp.cpp` but are not exported to R. For the unit tests we
+ * replicate their bodies here and expose thin wrappers with `Rcpp::export` so
+ * the helpers can be called directly from R. This keeps the package interface
+ * unchanged while still allowing the low level algorithms to be verified.
+ */
+
 double computeConditionalMean_cpp(NumericVector mu,
                                   NumericVector samp,
                                   const NumericMatrix XmX,
@@ -134,23 +143,36 @@ void computeGradient_cpp(NumericVector gradient, NumericVector Xy,
   }
 }
 
+// Exported wrappers ---------------------------------------------------------
+
+/* Compute conditional mean (test wrapper)
+ *
+ * This function simply forwards to `computeConditionalMean_cpp` which
+ * mirrors the internal sampler helper.  Exposed for unit tests only.
+ */
 // [[Rcpp::export]]
 double test_computeConditionalMean(NumericVector mu, NumericVector samp,
                                    NumericMatrix XmX, double yvar, int index) {
   return computeConditionalMean_cpp(mu, samp, XmX, yvar, index);
 }
 
+/* Check zero-condition bounds (test wrapper)
+ * Exposes `innerZeroCondition_cpp` to R so tests can verify the
+ * selection-region logic.
+ */
 // [[Rcpp::export]]
 int test_innerZeroCondition(NumericVector samp, NumericVector l,
                             NumericVector u) {
   return innerZeroCondition_cpp(samp, l, u);
 }
 
+/* Check one-condition thresholds (test wrapper) */
 // [[Rcpp::export]]
 int test_innerCheckOneCondition(NumericVector samp, NumericVector thresh) {
   return innerCheckOneCondition_cpp(samp, thresh);
 }
 
+/* Compute zero-coordinate thresholds (test wrapper) */
 // [[Rcpp::export]]
 NumericMatrix test_computeZeroThresholds(NumericMatrix u0mat,
                                          NumericVector signs) {
@@ -164,6 +186,7 @@ NumericMatrix test_computeZeroThresholds(NumericMatrix u0mat,
   return out;
 }
 
+/* Compute one-coordinate thresholds (test wrapper) */
 // [[Rcpp::export]]
 NumericVector test_computeOneThreshold(NumericVector signs, double lambda,
                                        NumericMatrix XmXinv) {
@@ -172,17 +195,20 @@ NumericVector test_computeOneThreshold(NumericVector signs, double lambda,
   return u;
 }
 
+/* Compute threshold difference for a coordinate (test wrapper) */
 // [[Rcpp::export]]
 double test_computeDiffThreshold(NumericVector signs, double lambda,
                                  NumericMatrix XmXinv, int coordinate) {
   return computeDiffThreshold_cpp(signs, lambda, XmXinv, coordinate);
 }
 
+/* Sign helper used in gradient updates (test wrapper) */
 // [[Rcpp::export]]
 double test_sign(double x) {
   return sign_cpp(x);
 }
 
+/* Bound estimated coefficients by naive solution (test wrapper) */
 // [[Rcpp::export]]
 NumericVector test_boundBeta(NumericVector estimate, NumericVector naive) {
   NumericVector est = clone(estimate);
@@ -190,6 +216,7 @@ NumericVector test_boundBeta(NumericVector estimate, NumericVector naive) {
   return est;
 }
 
+/* Compute gradient step for sampler optimisation (test wrapper) */
 // [[Rcpp::export]]
 NumericVector test_computeGradient(NumericVector gradient, NumericVector Xy,
                                    NumericVector samp, NumericMatrix XmX,

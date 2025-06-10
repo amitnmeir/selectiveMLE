@@ -1,3 +1,7 @@
+# Tests for the sampler utility functions implemented in C++.
+# The utilities themselves are duplicated in `cpp_utils.cpp` and compiled
+# via `helper-cpp-utils.R`.  Exporting them this way keeps the package API
+# untouched while allowing `testthat` to verify the low level calculations.
 context('C++ sampler utilities')
 
 # compile helpers via helper-cpp-utils.R (already sourced)
