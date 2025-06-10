@@ -27,10 +27,13 @@
  * for `lassoSampler` which is registered via Rcpp attributes.
  */
 
-#include <Rcpp.h>
+#include <RcppArmadillo.h>
+// [[Rcpp::depends(RcppArmadillo)]]
+// [[Rcpp::plugins(cpp11)]]
 #include <cmath>
 #include <algorithm>
 using namespace Rcpp;
+using namespace arma;
 
 /*
  * lassoSamplerCpp.cpp
@@ -229,13 +232,19 @@ void computeZeroThresholds(const NumericMatrix u0mat,
                            NumericVector signs,
                            NumericVector l,
                            NumericVector u) {
-  for(int i = 0; i < u0mat.nrow() ; i ++) {
-    u[i] = 1;
-    l[i] = -1;
-    for(int j = 0; j < signs.length() ; j ++) {
-      u[i] -= u0mat(i, j) * signs[j] ;
-      l[i] -= u0mat(i, j) * signs[j] ;
+  if(u0mat.ncol() != static_cast<int>(signs.size())) {
+    for(int i = 0; i < u0mat.nrow(); ++i) {
+      u[i] = 1.0;
+      l[i] = -1.0;
     }
+    return;
+  }
+  arma::mat A(u0mat.begin(), u0mat.nrow(), u0mat.ncol());
+  arma::colvec s(signs.begin(), signs.size(), false);
+  arma::colvec prod = A * s;
+  for(int i = 0; i < A.n_rows; ++i) {
+    u[i] = 1.0 - prod[i];
+    l[i] = -1.0 - prod[i];
   }
 }
 
@@ -247,15 +256,12 @@ void computeZeroThresholds(const NumericMatrix u0mat,
  */
 void computeOneThreshold(NumericVector signs,
                          double lambda,
-                         const NumericMatrix XmXinv,
+                         const NumericMatrix &XmXinv,
                          NumericVector u) {
-  for(int i = 0 ; i < XmXinv.nrow() ; i++) {
-    u[i] = 0 ;
-    for(int j = 0 ; j < XmXinv.ncol() ; j++) {
-      u[i] += XmXinv(i, j) * signs[j] ;
-    }
-    u[i] *= lambda ;
-  }
+  arma::mat inv(XmXinv.begin(), XmXinv.nrow(), XmXinv.ncol());
+  arma::colvec s(signs.begin(), signs.size(), false);
+  arma::colvec res = lambda * inv * s;
+  std::copy(res.begin(), res.end(), u.begin());
 }
 
 /**
@@ -265,18 +271,13 @@ void computeOneThreshold(NumericVector signs,
  */
 double computeDiffThreshold(NumericVector signs,
                             double lambda,
-                            const NumericMatrix XmXinv,
+                            const NumericMatrix &XmXinv,
                             int coordinate) {
-  double result = 0;
-  for(int i = 0 ; i < XmXinv.ncol() ; i++) {
-    if(i == coordinate) {
-      result -= XmXinv(coordinate, i) * signs[i] ;
-    } else {
-      result += XmXinv(coordinate, i) * signs[i] ;
-    }
-  }
-
-  return result * lambda ;
+  arma::mat inv(XmXinv.begin(), XmXinv.nrow(), XmXinv.ncol());
+  arma::colvec s(signs.begin(), signs.size(), false);
+  double rowDot = arma::dot(inv.row(coordinate), s);
+  double result = rowDot - 2.0 * inv(coordinate, coordinate) * signs[coordinate];
+  return result * lambda;
 }
 
 /** Copy the contents of one numeric vector to another. */
@@ -430,16 +431,16 @@ void computeGradient(NumericVector gradient, NumericVector Xy,
 void computeConditionalBeta(NumericVector &betaOut,
                             const NumericMatrix &estimateMat,
                             int iter) {
-  int meanStart = std::max(0, iter - 300) ;
-  double denominator = iter - meanStart + 1 ;
-  for(int i = 0; i < estimateMat.ncol() ; i++) {
+  int meanStart = std::max(0, iter - 300);
+  double denominator = iter - meanStart + 1;
+  for(int i = 0; i < estimateMat.ncol(); i++) {
     betaOut[i] = 0;
     int denominator = 0;
-    for(int j = meanStart ; j <= iter ; j++) {
-      denominator++ ;
-      betaOut[i] += estimateMat(j, i) ;
+    for(int j = meanStart; j <= iter; j++) {
+      denominator++;
+      betaOut[i] += estimateMat(j, i);
     }
-    betaOut[i] /= denominator ;
+    betaOut[i] /= denominator;
   }
 }
 
