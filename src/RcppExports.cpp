@@ -6,10 +6,16 @@
 
 using namespace Rcpp;
 
+#ifdef RCPP_USE_GLOBAL_ROSTREAM
+Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
+Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
+#endif
+
 // lassoSampler
-void lassoSampler(const NumericVector initEst, const NumericVector initSamp, NumericMatrix oneCov, NumericMatrix XmX, NumericMatrix XmXinv, NumericVector condSigma, double lambda, double ysigsq, NumericVector zeroMean, NumericMatrix sqrtZero, NumericMatrix u0mat, int n, int p, int nsamp, int burnin, NumericVector Xy, NumericMatrix& estimateMat, NumericMatrix& sampMat, int delay, double stepRate, double stepCoef, double gradientBound, int assumeConvergence, NumericVector naive, bool methodExact, bool verbose);
+/**  * Main workhorse implementing the selective MLE sampler for the  * lasso.  The function alternates between sampling the active set  * coefficients and performing stochastic gradient updates.  It is  * exposed to R via Rcpp and is not intended to be called directly  * by users.  *  * @param initEst  Initial estimate of the regression coefficients.  * @param initSamp Starting point for the sampler.  * @param oneCov   Conditional covariance matrix for the active set.  * @param XmX      Cross product of the design matrix.  * @param XmXinv   Inverse of XmX restricted to the active set.  * @param condSigma Conditional variances for each coefficient.  * @param lambda   Lasso penalty value.  * @param ysigsq   Residual variance.  * @param zeroMean Mean vector for the zero part of Ay.  * @param sqrtZero Square root of the covariance for the zero part.  * @param u0mat    Constraint matrix defining the selection event.  * @param n,p      Dimensions of the design matrix.  * @param nsamp    Number of Gibbs samples per outer iteration.  * @param burnin   Length of the burn-in period.  * @param Xy       Cross product of X and y.  * @param estimateMat Matrix to store estimates at each iteration.  * @param sampMat  Matrix to store sampler draws at each iteration.  * @param delay,stepRate,stepCoef Parameters controlling the optimiser.  * @param gradientBound Bound on the gradient magnitude.  * @param assumeConvergence Iteration at which optimisation stops.  * @param naive    Naive lasso estimate used for bounding.  * @param methodExact Whether to perform exact polyhedral sampling.  * @param verbose  If true, progress is printed to the console.  */ NumericVector lassoSampler(const NumericVector initEst, const NumericVector initSamp, NumericMatrix oneCov, NumericMatrix XmX, NumericMatrix XmXinv, NumericVector condSigma, double lambda, double ysigsq, NumericVector zeroMean, NumericMatrix sqrtZero, NumericMatrix u0mat, int n, int p, int nsamp, int burnin, NumericVector Xy, NumericMatrix& estimateMat, NumericMatrix& sampMat, int delay, double stepRate, double stepCoef, double gradientBound, int assumeConvergence, NumericVector naive, bool methodExact, bool verbose);
 RcppExport SEXP _selectiveMLE_lassoSampler(SEXP initEstSEXP, SEXP initSampSEXP, SEXP oneCovSEXP, SEXP XmXSEXP, SEXP XmXinvSEXP, SEXP condSigmaSEXP, SEXP lambdaSEXP, SEXP ysigsqSEXP, SEXP zeroMeanSEXP, SEXP sqrtZeroSEXP, SEXP u0matSEXP, SEXP nSEXP, SEXP pSEXP, SEXP nsampSEXP, SEXP burninSEXP, SEXP XySEXP, SEXP estimateMatSEXP, SEXP sampMatSEXP, SEXP delaySEXP, SEXP stepRateSEXP, SEXP stepCoefSEXP, SEXP gradientBoundSEXP, SEXP assumeConvergenceSEXP, SEXP naiveSEXP, SEXP methodExactSEXP, SEXP verboseSEXP) {
 BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const NumericVector >::type initEst(initEstSEXP);
     Rcpp::traits::input_parameter< const NumericVector >::type initSamp(initSampSEXP);
@@ -37,8 +43,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericVector >::type naive(naiveSEXP);
     Rcpp::traits::input_parameter< bool >::type methodExact(methodExactSEXP);
     Rcpp::traits::input_parameter< bool >::type verbose(verboseSEXP);
-    lassoSampler(initEst, initSamp, oneCov, XmX, XmXinv, condSigma, lambda, ysigsq, zeroMean, sqrtZero, u0mat, n, p, nsamp, burnin, Xy, estimateMat, sampMat, delay, stepRate, stepCoef, gradientBound, assumeConvergence, naive, methodExact, verbose);
-    return R_NilValue;
+    rcpp_result_gen = Rcpp::wrap(lassoSampler(initEst, initSamp, oneCov, XmX, XmXinv, condSigma, lambda, ysigsq, zeroMean, sqrtZero, u0mat, n, p, nsamp, burnin, Xy, estimateMat, sampMat, delay, stepRate, stepCoef, gradientBound, assumeConvergence, naive, methodExact, verbose));
+    return rcpp_result_gen;
 END_RCPP
 }
 // mvtSampler
