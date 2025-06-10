@@ -1,6 +1,9 @@
-#include <Rcpp.h>
+#include <RcppArmadillo.h>
+// [[Rcpp::depends(RcppArmadillo)]]
+// [[Rcpp::plugins(cpp11)]]
 #include "mleHeader.h"
 using namespace Rcpp;
+using namespace arma;
 
 /*
  * normalSamplerCpp.cpp
