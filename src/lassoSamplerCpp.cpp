@@ -31,6 +31,22 @@
 #include <cmath>
 using namespace Rcpp;
 
+/*
+ * lassoSamplerCpp.cpp
+ *
+ * This file implements the Metropolis--Hastings and Gibbs sampling
+ * routines used by the `lassoMLE` R function. The sampler generates
+ * draws from the conditional distribution of the refitted regression
+ * coefficients given that a particular lasso model was selected.  The
+ * samples are then used within a stochastic gradient procedure to
+ * approximate the selective maximum likelihood estimator described in
+ * Lee et al. (2016).  The code relies heavily on truncated normal
+ * proposals and coordinate-wise updates.
+ *
+ * All functions are designed to be called from R via Rcpp and assume
+ * column–major numeric vectors and matrices.
+ */
+
 # define M_PI           3.14159265358979323846  /* pi */
 const double log2pi = log(2.0 * 3.1415926535897932384);
 
@@ -161,9 +177,10 @@ double computeConditionalMean(NumericVector mu,
 }
 
 /**
- * Checks whether a sample lies within box constraints defined
- * by `l` and `u`.  Used for validating draws from the zero part
- * of the sampler.
+ * Check whether every element of `samp` lies between the
+ * corresponding lower `l` and upper `u` bounds.  Returns 1 if the
+ * condition holds and 0 otherwise.  Used to verify whether the current
+ * sample satisfies the zero-coordinate constraints.
  */
 int innerZeroCondition(NumericVector samp,
                        const NumericVector l,
@@ -183,9 +200,9 @@ int innerZeroCondition(NumericVector samp,
 }
 
 /**
- * Tests if the current sample satisfies the sign constraints
- * implied by the lasso model.  A zero return value indicates
- * violation of the constraint.
+ * Determine whether the current sample of coefficients satisfies the
+ * one-step sampling constraints encoded in `threshold`.  Returns 1 if
+ * all coordinates are within the allowed region and 0 otherwise.
  */
 int innerCheckOneCondition(NumericVector samp,
                            NumericVector threshold) {
@@ -201,10 +218,11 @@ int innerCheckOneCondition(NumericVector samp,
 }
 
 /**
- * Given a matrix representing constraints for the inactive set (u0mat)
- * and a vector of signs for the active coefficients, compute the lower
- * and upper bounds on the zero components.  These bounds define the
- * polyhedral region in which the zero part of the response must lie.
+ * Compute the lower and upper bounds defining the selection region for
+ * the coordinates that were not selected by the lasso.  The matrix
+ * `u0mat` corresponds to the design matrix of inactive variables and
+ * `signs` gives the current sign configuration of the active
+ * coefficients.
  */
 void computeZeroThresholds(const NumericMatrix u0mat,
                            NumericVector signs,
@@ -221,9 +239,10 @@ void computeZeroThresholds(const NumericMatrix u0mat,
 }
 
 /**
- * Compute thresholds for the active coordinates.  The thresholds
- * correspond to the current signs and the lasso penalty `lambda` and
- * are used when sampling the active regression coefficients.
+ * Compute the truncation thresholds used when sampling the active
+ * coefficients.  The thresholds depend on the current sign vector and
+ * the inverse design matrix `XmXinv` scaled by the lasso penalty
+ * `lambda`.
  */
 void computeOneThreshold(NumericVector signs,
                          double lambda,
@@ -239,9 +258,9 @@ void computeOneThreshold(NumericVector signs,
 }
 
 /**
- * Threshold used when proposing a change of sign for a single
- * coordinate.  Essentially computes the effect of flipping one
- * sign while keeping the others fixed.
+ * Compute the change in the truncation threshold that would result from
+ * flipping the sign of a single coordinate.  This is used when
+ * proposing sign changes in the Metropolis--Hastings step.
  */
 double computeDiffThreshold(NumericVector signs,
                             double lambda,
@@ -259,7 +278,7 @@ double computeDiffThreshold(NumericVector signs,
   return result * lambda ;
 }
 
-/** Simple helper that copies one NumericVector into another. */
+/** Copy the contents of one numeric vector to another. */
 void copyVector(NumericVector to, NumericVector from) {
   for(int i = 0 ; i < to.length() ; i++) {
     to[i] = from[i] ;
@@ -381,9 +400,10 @@ double sign(double x) {
 }
 
 /**
- * Computes the stochastic gradient used to update the regression
- * coefficients during the optimisation phase of the sampler.
- * Step sizes are scaled according to `stepRate` and `delay`.
+ * Compute a stochastic gradient step for the selective likelihood.  The
+ * gradient is scaled by a decreasing step size controlled by
+ * `stepCoef`, `stepRate` and `delay` and is clipped to
+ * `gradientBound` to ensure stability.
  */
 void computeGradient(NumericVector gradient, NumericVector Xy,
                      NumericVector samp, NumericMatrix XmX,
@@ -404,9 +424,9 @@ void computeGradient(NumericVector gradient, NumericVector Xy,
 }
 
 /**
- * Forms a running mean of the estimated regression coefficients
- * over the last few iterations.  This smooths out the Monte Carlo
- * noise before final convergence is assumed.
+ * Compute a running mean of the estimated coefficients over the last
+ * 300 iterations of the optimization.  The result is stored in
+ * `betaOut`.
  */
 void computeConditionalBeta(NumericVector &betaOut,
                             const NumericMatrix &estimateMat,
@@ -476,9 +496,10 @@ double mvtLogDens(NumericVector samp, NumericVector mean,
 }
 
 /**
- * Performs Metropolis-Hastings updates of the active set signs.
- * The proposal either flips a sign or jointly samples all active
- * coefficients when the constraints are not satisfied.
+ * Metropolis--Hastings update that proposes sign changes for the active
+ * coefficients and possibly resamples all coefficients if necessary.
+ * This step is responsible for exploring the truncated distribution
+ * defined by the lasso selection event.
  */
 void mhSampler(NumericVector samp, NumericVector oldSamp,
                NumericVector signs, NumericVector newsigns,
@@ -599,6 +620,11 @@ void mhSampler(NumericVector samp, NumericVector oldSamp,
   }
 }
 
+/**
+ * Main driver routine used by `lassoMLE`.  Runs a block Gibbs sampler
+ * combined with stochastic gradient updates in order to approximate the
+ * selective MLE for a lasso-selected model.
+ */
 // [[Rcpp::export]]
 /**
  * Main workhorse implementing the selective MLE sampler for the
