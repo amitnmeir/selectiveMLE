@@ -29,6 +29,7 @@
 
 #include <RcppArmadillo.h>
 // [[Rcpp::depends(RcppArmadillo)]]
+#include "progress.hpp"
 // [[Rcpp::depends(RcppProgress)]]
 // [[Rcpp::plugins(cpp11)]]
 // [[Rcpp::plugins(openmp)]]
