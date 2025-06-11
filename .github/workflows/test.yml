@@ -15,8 +15,8 @@ jobs:
           use-public-rspm: true
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: devtools
+          extra-packages: testthat
+      - name: Install package
+        run: R CMD INSTALL .
       - name: Run tests
-        run: |
-          R -q -e 'devtools::install(dependencies = TRUE)'
-          R -q -e 'devtools::test()'
+        run: R -q -e 'testthat::test_local()'
