@@ -60,7 +60,9 @@ res$CI
 
 More elaborate demonstrations can be found in the scripts
 `lassoMLE example script.R` and `mvtnorm example script.R` at the top of
-this repository.
+this repository. The latter now logs progress and prints results with
+`knitr::kable` and simple ASCII histograms so that it can be run easily in
+a terminal session.
 
 ## Running tests
 

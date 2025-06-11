@@ -1,9 +1,21 @@
-library(selectiveMLE)
-library(reshape2)
-library(ggplot2)
+## Example demonstrating truncNormMLE in a terminal friendly way
+suppressPackageStartupMessages({
+  library(selectiveMLE)
+  library(knitr)
+})
+
+ascii_hist <- function(x, bins = 10, width = 50) {
+  h <- hist(x, breaks = bins, plot = FALSE)
+  max_count <- max(h$counts)
+  for (i in seq_along(h$counts)) {
+    bar <- if (max_count > 0) {
+      paste(rep("#", round(width * h$counts[i] / max_count)), collapse = "")
+    } else ""
+    cat(sprintf("%8.2f | %s\n", h$mids[i], bar))
+  }
+}
 # Simulation Parameters --------------
 set.seed(123)
-#set.seed(501)
 p <- 100
 rho <- 0.3
 sigma <- matrix(rho, nrow = p, ncol = p)
@@ -14,70 +26,45 @@ signalsd <- 2
 nullsd <- 0.0000005
 cialpha <- 0.05
 
-# Generating Data ------------
+message("Generating data ...")
 ind <- rbinom(p, 1, plarge)
 mu <- (1 - ind) * rnorm(p, mean = 0, sd = nullsd) + ind * rnorm(p, mean = 0, sd = signalsd)
 mu <- rep(0, p)
 mu[1:20] <- rnorm(20, 0, 2)
 y <- rep(0, p)
-while(all(y < abs(threshold))) {
+while (all(y < abs(threshold))) {
   y <- as.vector(mvtnorm::rmvnorm(1, mu, sigma))
 }
 selected <- abs(y) > threshold
 
-# Computing MLE --------------
+message("Computing conditional MLE ...")
 fit <- truncNormMLE(y, sigma, threshold, cialpha = cialpha,
                     maxiter = 500)
 
-# Plotting Solution Path --------------------
+# Solution path (first selected parameter)
 path <- fit$solutionPath
-path <- path[, selected]
-path <- melt(path)
-names(path) <- c("iter", "param", "estimate")
-pathplot <- ggplot(path) + geom_line(aes(x = iter, y = estimate, col = factor(param))) +
-  geom_hline(yintercept = 0) + theme_bw() +
-  scale_color_discrete(guide = "none") + xlab("Iteration") +
-  ylab("Estimate")
-pathplot
-if(!dir.exists("figures")) dir.create("figures")
-library(cowplot)
-save_plot(pathplot, file = "figures/mvnPath.pdf",
-          base_width = 5, base_height = 3)
+path <- path[, selected, drop = FALSE]
+message("Solution path for parameter 1:")
+ascii_hist(path[, 1])
 
-# Plotting Estimates and CIs ------------------------
+# Summarise estimates and confidence intervals
 true <- mu[selected]
-offset <- 0.2
 naive <- y[selected]
-order <- order(naive)
 lci <- naive + qnorm(cialpha / 2) * sqrt(diag(sigma)[selected])
 uci <- naive + qnorm(1 - cialpha / 2) * sqrt(diag(sigma)[selected])
 naivecover <- mean(lci < true & uci > true)
-naive <- data.frame(var = order(naive), estimate = naive, lci = lci, uci = uci, method = "naive",
-                    offset = offset *  1)
-naive$var[order] <- 1:nrow(naive)
-
 conditional <- fit$mle
-lci <- fit$CI[, 1]
-uci <- fit$CI[, 2]
-condcover <- mean(lci < true & uci > true)
-conditional <- data.frame(var = naive$var, estimate = conditional, lci = lci, uci = uci, method = "conditional",
-                          offset = offset * 0)
+condcover <- mean(fit$CI[, 1] < true & fit$CI[, 2] > true)
 
-true <- data.frame(var = naive$var, estimate = true, lci = NA, uci = NA, method = "true",
-                   offset = offset * 2)
-
-forplot <- rbind(naive, conditional, true)
-forplot$method <- factor(forplot$method, levels = c("conditional", "naive", "true"))
-
-# pdf("figures/mvtCIexample.pdf",pagecentre=T, width=8,height=4.5 ,paper = "special")
-ggplot(forplot, aes(x = var + offset, xend = var + offset)) +
-  geom_point(aes(y = estimate, shape = method)) +
-  geom_segment(data = subset(forplot, method != "true"), aes(y = lci, yend = uci, col = method, linetype = method)) +
-  theme_bw() + geom_hline(yintercept = 0) +
-  geom_hline(yintercept = c(-threshold, threshold), col = "grey", linetype = 2) +
-  xlab("variable #")
-# dev.off()
-
+tab <- data.frame(
+  estimate = conditional,
+  CI_lower = fit$CI[, 1],
+  CI_upper = fit$CI[, 2],
+  naive_est = naive
+)
+message("Coverage (naive, conditional):")
 print(c(naivecover, condcover))
+message("\nEstimates and CIs:")
+knitr::kable(head(tab))
 
 
