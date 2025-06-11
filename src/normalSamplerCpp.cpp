@@ -2,6 +2,8 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::plugins(cpp11)]]
 #include "mleHeader.h"
+// [[Rcpp::plugins(openmp)]]
+#include <omp.h>
 using namespace Rcpp;
 using namespace arma;
 
