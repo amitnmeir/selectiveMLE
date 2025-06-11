@@ -1,3 +1,4 @@
+library(selectiveMLE)
 library(reshape2)
 library(ggplot2)
 # Simulation Parameters --------------
@@ -35,9 +36,10 @@ path <- melt(path)
 names(path) <- c("iter", "param", "estimate")
 pathplot <- ggplot(path) + geom_line(aes(x = iter, y = estimate, col = factor(param))) +
   geom_hline(yintercept = 0) + theme_bw() +
-  scale_color_discrete(guide = FALSE) + xlab("Iteration") +
+  scale_color_discrete(guide = "none") + xlab("Iteration") +
   ylab("Estimate")
 pathplot
+if(!dir.exists("figures")) dir.create("figures")
 library(cowplot)
 save_plot(pathplot, file = "figures/mvnPath.pdf",
           base_width = 5, base_height = 3)
