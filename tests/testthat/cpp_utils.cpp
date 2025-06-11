@@ -1,6 +1,8 @@
 #include <Rcpp.h>
+// [[Rcpp::plugins(openmp)]]
 #include <cmath>
 #include <algorithm>
+#include <omp.h>
 using namespace Rcpp;
 
 /*
@@ -59,6 +61,7 @@ void computeZeroThresholds_cpp(const NumericMatrix u0mat,
                                NumericVector signs,
                                NumericVector l,
                                NumericVector u) {
+  #pragma omp parallel for default(none) shared(u, l, signs, u0mat)
   for(int i = 0; i < u0mat.nrow() ; i ++) {
     u[i] = 1;
     l[i] = -1;
@@ -73,12 +76,13 @@ void computeOneThreshold_cpp(NumericVector signs,
                              double lambda,
                              const NumericMatrix XmXinv,
                              NumericVector u) {
+  #pragma omp parallel for default(none) shared(u, signs, XmXinv, lambda)
   for(int i = 0 ; i < XmXinv.nrow() ; i++) {
-    u[i] = 0 ;
+    double val = 0 ;
     for(int j = 0 ; j < XmXinv.ncol() ; j++) {
-      u[i] += XmXinv(i, j) * signs[j] ;
+      val += XmXinv(i, j) * signs[j] ;
     }
-    u[i] *= lambda ;
+    u[i] = val * lambda ;
   }
 }
 
@@ -109,6 +113,7 @@ double sign_cpp(double x) {
 }
 
 void boundBeta_cpp(NumericVector estimate, NumericVector naive) {
+  #pragma omp parallel for default(none) shared(estimate, naive)
   for(int i = 0 ; i < estimate.length() ; i++) {
     if(naive[i] < 0) {
       if(estimate[i] < naive[i]) {
@@ -132,15 +137,17 @@ void computeGradient_cpp(NumericVector gradient, NumericVector Xy,
                          double gradientBound,
                          int iter, int delay) {
   stepCoef = stepCoef / std::pow(std::max(1, iter + 1 - delay), stepRate);
+#pragma omp parallel for default(none) shared(gradient, Xy, samp, XmX, stepCoef, gradientBound)
   for(int i = 0 ; i < gradient.length() ; i++) {
-    gradient[i] = Xy[i];
+    double g = Xy[i];
     for(int j = 0 ; j < XmX.ncol() ; j++) {
-      gradient[i] -= XmX(i, j) * samp[j];
+      g -= XmX(i, j) * samp[j];
     }
-    gradient[i] *= stepCoef;
-    if(std::abs(gradient[i]) > gradientBound) {
-      gradient[i] = gradientBound * sign_cpp(gradient[i]);
+    g *= stepCoef;
+    if(std::abs(g) > gradientBound) {
+      g = gradientBound * sign_cpp(g);
     }
+    gradient[i] = g;
   }
 }
 

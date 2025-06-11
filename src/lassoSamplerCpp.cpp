@@ -30,6 +30,8 @@
 #include <RcppArmadillo.h>
 // [[Rcpp::depends(RcppArmadillo)]]
 // [[Rcpp::plugins(cpp11)]]
+// [[Rcpp::plugins(openmp)]]
+#include <omp.h>
 #include <cmath>
 #include <algorithm>
 using namespace Rcpp;
@@ -233,6 +235,7 @@ void computeZeroThresholds(const NumericMatrix u0mat,
                            NumericVector l,
                            NumericVector u) {
   if(u0mat.ncol() != static_cast<int>(signs.size())) {
+    #pragma omp parallel for default(none) shared(u, l, u0mat)
     for(int i = 0; i < u0mat.nrow(); ++i) {
       u[i] = 1.0;
       l[i] = -1.0;
@@ -242,6 +245,7 @@ void computeZeroThresholds(const NumericMatrix u0mat,
   arma::mat A(u0mat.begin(), u0mat.nrow(), u0mat.ncol());
   arma::colvec s(signs.begin(), signs.size(), false);
   arma::colvec prod = A * s;
+  #pragma omp parallel for default(none) shared(u, l, prod, A)
   for(int i = 0; i < A.n_rows; ++i) {
     u[i] = 1.0 - prod[i];
     l[i] = -1.0 - prod[i];
@@ -411,15 +415,17 @@ void computeGradient(NumericVector gradient, NumericVector Xy,
                      double gradientBound,
                      int iter, int delay) {
   stepCoef = stepCoef / std::pow(std::max(1, iter + 1 - delay), stepRate) ;
+#pragma omp parallel for default(none) shared(gradient, Xy, samp, XmX, stepCoef, gradientBound)
   for(int i = 0 ; i < gradient.length() ; i++) {
-    gradient[i] = Xy[i];
+    double g = Xy[i];
     for(int j = 0 ; j < XmX.ncol() ; j++) {
-      gradient[i] -= XmX(i, j) * samp[j] ;
+      g -= XmX(i, j) * samp[j] ;
     }
-    gradient[i] *= stepCoef ;
-    if(std::abs(gradient[i]) > gradientBound) {
-      gradient[i] = gradientBound * sign(gradient[i]) ;
+    g *= stepCoef ;
+    if(std::abs(g) > gradientBound) {
+      g = gradientBound * sign(g) ;
     }
+    gradient[i] = g;
   }
 }
 
@@ -432,15 +438,15 @@ void computeConditionalBeta(NumericVector &betaOut,
                             const NumericMatrix &estimateMat,
                             int iter) {
   int meanStart = std::max(0, iter - 300);
-  double denominator = iter - meanStart + 1;
+  #pragma omp parallel for default(none) shared(betaOut, estimateMat, iter, meanStart)
   for(int i = 0; i < estimateMat.ncol(); i++) {
-    betaOut[i] = 0;
+    double sum = 0.0;
     int denominator = 0;
     for(int j = meanStart; j <= iter; j++) {
       denominator++;
-      betaOut[i] += estimateMat(j, i);
+      sum += estimateMat(j, i);
     }
-    betaOut[i] /= denominator;
+    betaOut[i] = sum / denominator;
   }
 }
 
@@ -450,6 +456,7 @@ void computeConditionalBeta(NumericVector &betaOut,
  * not cross zero or exceed the naive estimates in magnitude.
  */
 void boundBeta(NumericVector &estimate, NumericVector naive) {
+  #pragma omp parallel for default(none) shared(estimate, naive)
   for(int i = 0 ; i < estimate.length() ; i++) {
     if(naive[i] < 0) {
       if(estimate[i] < naive[i]) {
@@ -474,25 +481,23 @@ void boundBeta(NumericVector &estimate, NumericVector naive) {
  */
 double mvtLogDens(NumericVector samp, NumericVector mean,
                   NumericMatrix XmX, double ysigsq) {
-  NumericVector diff = NumericVector(samp.length()) ;
+  NumericVector diff(samp.length());
+  #pragma omp parallel for default(none) shared(diff, samp, mean)
   for(int i = 0 ; i < diff.length() ; i++) {
-    diff[i] = samp[i] - mean[i] ;
+    diff[i] = samp[i] - mean[i];
   }
 
-  NumericVector inner = NumericVector(diff.length()) ;
-  for(int i = 0 ; i < inner.length() ; i ++) {
-    inner[i] = 0 ;
-    for(int j = 0 ; j < inner.length() ; j ++) {
-      inner[i] += XmX(i, j) * diff[j] ;
+  double result = 0.0;
+  #pragma omp parallel for reduction(+:result) default(none) shared(diff, XmX)
+  for(int i = 0 ; i < diff.length() ; i++) {
+    double inner = 0.0;
+    for(int j = 0 ; j < diff.length() ; j++) {
+      inner += XmX(i, j) * diff[j];
     }
+    result += inner * diff[i];
   }
 
-  double result = 0 ;
-  for(int i = 0 ; i < inner.length() ; i ++) {
-    result += inner[i] * diff[i] ;
-  }
-
-  return - 0.5 / ysigsq * result ;
+  return -0.5 / ysigsq * result;
 }
 
 /**
