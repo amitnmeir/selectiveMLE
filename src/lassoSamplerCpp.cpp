@@ -677,6 +677,9 @@ NumericVector lassoSampler(const NumericVector initEst,
                     int delay, double stepRate, double stepCoef,
                     double gradientBound, int assumeConvergence,
                     NumericVector naive, bool methodExact, bool verbose) {
+#ifdef _OPENMP
+  omp_set_num_threads(1);
+#endif
   // Initializing Sampling order
   IntegerVector order = IntegerVector(initEst.length()) ;
   for(int i = 0; i < order.length() ; i++) order[i] = i ;
