@@ -2,18 +2,8 @@
 suppressPackageStartupMessages({
   library(selectiveMLE)
   library(knitr)
+  library(txtplot)
 })
-
-ascii_hist <- function(x, bins = 10, width = 50) {
-  h <- hist(x, breaks = bins, plot = FALSE)
-  max_count <- max(h$counts)
-  for (i in seq_along(h$counts)) {
-    bar <- if (max_count > 0) {
-      paste(rep("#", round(width * h$counts[i] / max_count)), collapse = "")
-    } else ""
-    cat(sprintf("%8.2f | %s\n", h$mids[i], bar))
-  }
-}
 # Simulation Parameters --------------
 set.seed(123)
 p <- 100
@@ -45,7 +35,8 @@ fit <- truncNormMLE(y, sigma, threshold, cialpha = cialpha,
 path <- fit$solutionPath
 path <- path[, selected, drop = FALSE]
 message("Solution path for parameter 1:")
-ascii_hist(path[, 1])
+h <- hist(path[, 1], plot = FALSE)
+txtplot::txtplot(h$mids, h$counts, xlab = "estimate", ylab = "count")
 
 # Summarise estimates and confidence intervals
 true <- mu[selected]

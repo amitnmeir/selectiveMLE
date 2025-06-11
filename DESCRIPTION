@@ -12,5 +12,8 @@ LazyData: true
 LinkingTo: Rcpp, RcppArmadillo, RcppProgress
 Imports: Rcpp, glmnet, progress
 RoxygenNote: 6.0.1
-Suggests: knitr, rmarkdown, testthat
+Suggests: knitr, rmarkdown, testthat,
+    mvtnorm, txtplot,
+    dplyr, reshape2, selectiveInference,
+    ggplot2
 VignetteBuilder: knitr
