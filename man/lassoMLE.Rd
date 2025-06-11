@@ -4,9 +4,21 @@
 \alias{lassoMLE}
 \title{Maximum Likelihood Inference for Models Selected by the LASSO}
 \usage{
-lassoMLE(y, X, lambda = "lambda.min", ysig = NULL, lassoFit = NULL,
-  delay = 50, optimSteps = 1000, sampSteps = 2000, stepCoef = 0.001,
-  stepRate = 0.85, method = c("exact", "selected"))
+lassoMLE(
+  y,
+  X,
+  lambda = "lambda.min",
+  ysig = NULL,
+  lassoFit = NULL,
+  delay = 50,
+  optimSteps = 1000,
+  sampSteps = 2000,
+  stepCoef = 0.001,
+  stepRate = 0.85,
+  method = c("exact", "selected"),
+  verbose = TRUE,
+  multiThread = TRUE
+)
 }
 \arguments{
 \item{y}{response variable.}
@@ -39,8 +51,9 @@ stochastic gradient.}
 \item{method}{optimization method, "selected" is faster than "exact"
 but may not converge to the exact MLE. See description for details.}
 
-\item{verbose}{logical; if \code{TRUE} a progress bar is displayed during
- optimisation and sampling.}
+\item{verbose}{whether to report computation progress}
+
+\item{multiThread}{whether to enable OpenMP multi-threading}
 }
 \value{
 \code{lassoMLE} returns an object of class \code{lassoMLE} which

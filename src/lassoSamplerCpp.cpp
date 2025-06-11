@@ -29,6 +29,7 @@
 
 #include <RcppArmadillo.h>
 // [[Rcpp::depends(RcppArmadillo)]]
+#include "progress.hpp"
 // [[Rcpp::depends(RcppProgress)]]
 // [[Rcpp::plugins(cpp11)]]
 // [[Rcpp::plugins(openmp)]]
@@ -663,6 +664,7 @@ void mhSampler(NumericVector samp, NumericVector oldSamp,
  * @param naive    Naive lasso estimate used for bounding.
  * @param methodExact Whether to perform exact polyhedral sampling.
  * @param verbose  If true, progress is printed to the console.
+ * @param multiThread If false, OpenMP is restricted to a single thread.
  */
 NumericVector lassoSampler(const NumericVector initEst,
                     const NumericVector initSamp,
@@ -678,7 +680,13 @@ NumericVector lassoSampler(const NumericVector initEst,
                     NumericMatrix &estimateMat, NumericMatrix &sampMat,
                     int delay, double stepRate, double stepCoef,
                     double gradientBound, int assumeConvergence,
-                    NumericVector naive, bool methodExact, bool verbose) {
+                    NumericVector naive, bool methodExact, bool verbose,
+                    bool multiThread) {
+#ifdef _OPENMP
+  if(!multiThread) {
+    omp_set_num_threads(1);
+  }
+#endif
   // Initializing Sampling order
   IntegerVector order = IntegerVector(initEst.length()) ;
   for(int i = 0; i < order.length() ; i++) order[i] = i ;

@@ -6,10 +6,12 @@ test_that("lassoMLE replicates with fixed seed", {
   y <- as.numeric(X %*% beta + rnorm(30))
   set.seed(123)
   fit1 <- lassoMLE(y, X, optimSteps = 15, sampSteps = 15,
-                   delay = 1, verbose = FALSE)
+                   delay = 1, verbose = FALSE,
+                   multiThread = FALSE)
   set.seed(123)
   fit2 <- lassoMLE(y, X, optimSteps = 15, sampSteps = 15,
-                   delay = 1, stepRate = 0.5, verbose = FALSE)
+                   delay = 1, stepRate = 0.5, verbose = FALSE,
+                   multiThread = FALSE)
 
   expect_equal(fit1$conditionalBeta,
                c(1.11105249, -0.62402436, -0.20422738, 0.06220997),

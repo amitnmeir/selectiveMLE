@@ -38,6 +38,8 @@
 #' @param verbose logical; if \code{TRUE} a progress bar is shown during
 #'   optimisation and sampling.
 #'
+#' @param multiThread whether to enable OpenMP multi-threading
+#'
 #' @details The routine computes the conditional MLE for models selected
 #' by the lasso as well as post-selection confidence intervals which are
 #' based on the approximate distribution of the conditional MLE. The routine
@@ -91,7 +93,8 @@ lassoMLE <- function(y, X, lambda = "lambda.min",
                      sampSteps = 2000,
                      stepCoef = 0.001, stepRate = 0.85,
                      method = c("exact", "selected"),
-                     verbose = TRUE) {
+                     verbose = TRUE,
+                     multiThread = TRUE) {
 
   assumeConvergence <- optimSteps
   iterations <- optimSteps + sampSteps
@@ -184,7 +187,8 @@ lassoMLE <- function(y, X, lambda = "lambda.min",
                estimateMat = estimateMat, sampMat = betaSample,
                delay = delay, stepRate = stepRate, stepCoef = stepCoef,
                gradientBound = 0.02, assumeConvergence = assumeConvergence,
-               naive = naiveBeta, methodExact = methodExact, verbose = verbose)
+               naive = naiveBeta, methodExact = methodExact,
+               verbose = verbose, multiThread = multiThread)
 
   conditionalBeta <- estimateMat[nrow(estimateMat), ]
 
