@@ -24,8 +24,8 @@
 #'
 #' @param stepCoef fixed step size for stochastic gradient.
 #'
-#' @param verbose whether to report the progress of the optimization routine as
-#' it runs.
+#' @param verbose logical; if \code{TRUE} a progress bar from the
+#'   \code{progress} package is displayed during optimisation.
 #'
 #'
 #' @details The routine computes the conditional MLE for selected normal means.
@@ -92,8 +92,11 @@ truncNormMLE <- function(y, sigma, threshold,
   boolSelected <- selected == 1
 
   # Optimization Routine --------------------
-  if(verbose) print("Starting Optimization")
-  for(i in 2:maxiter) {
+  if (verbose) {
+    message("Starting Optimization")
+    pb <- progress::progress_bar$new(total = maxiter - 1, clear = FALSE)
+  }
+  for (i in 2:maxiter) {
     sampleMat <- mvtSampler(samp, estimate, selected, threshold,
                             precision, 5, 5, 5, FALSE)
     samp <- sampleMat[nrow(sampleMat), ]
@@ -104,14 +107,11 @@ truncNormMLE <- function(y, sigma, threshold,
     grad <- sign(grad) * pmin(abs(grad), 0.01)
     estimate[boolSelected] <- estimate[boolSelected] + grad
     solutionPath[i, ] <- estimate
-    if((i %% 100) == 0 & verbose) {
-      cat(round(i / maxiter, 2) * 100, "% ", sep = "")
-    }
+    if (verbose) pb$tick()
   }
-  if(verbose) cat("\n")
 
   # Computing Confidence Intervals -----------------
-  if(verbose) print("Computing Confidence Intervals")
+  if (verbose) message("Computing Confidence Intervals")
   mle <- colMeans(solutionPath[max(1, maxiter - 200):maxiter, ])
   sampleMat <- mvtSampler(samp, mle, selected, threshold,
                           precision, max(p * 50, 4000), 500, 25,

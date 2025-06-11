@@ -38,6 +38,9 @@ stochastic gradient.}
 
 \item{method}{optimization method, "selected" is faster than "exact"
 but may not converge to the exact MLE. See description for details.}
+
+\item{verbose}{logical; if \code{TRUE} a progress bar is displayed during
+ optimisation and sampling.}
 }
 \value{
 \code{lassoMLE} returns an object of class \code{lassoMLE} which
