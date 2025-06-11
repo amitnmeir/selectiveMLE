@@ -1,6 +1,8 @@
 #include <RcppArmadillo.h>
 // [[Rcpp::depends(RcppArmadillo)]]
+// [[Rcpp::depends(RcppProgress)]]
 // [[Rcpp::plugins(cpp11)]]
+#include <progress.hpp>
 #include "mleHeader.h"
 // [[Rcpp::plugins(openmp)]]
 #include <omp.h>
@@ -44,15 +46,15 @@ NumericVector mvtSampler(NumericVector y,
                          int nsamp, int burnin, int trim,
                          bool verbose) {
   int totalIter = burnin + (nsamp - 1) * trim ;
-  int frac = round(totalIter / 5) ;
-  int p = y.length() ;
-  NumericMatrix samples(nsamp, p) ;
+  Progress pb(totalIter, verbose);
+  int pdim = y.length() ;
+  NumericMatrix samples(nsamp, pdim) ;
   NumericVector samp = clone(y) ;
   double condmean, condsd, pprob, nprob, u ;
   int row = 0;
 
   for(int i = 0 ; i < (burnin + trim * nsamp) ; i ++) {
-    for(int j = 0 ; j < p ; j ++) {
+    for(int j = 0 ; j < pdim ; j ++) {
       condmean = computeConditionalMean(mu, samp, precision, 1, j) ;
       condsd = 1 / std::sqrt(precision(j, j)) ;
       if(selected[j] == 1) {
@@ -71,10 +73,7 @@ NumericVector mvtSampler(NumericVector y,
       }
     }
 
-    if(verbose & ((((i + 1) % frac) == 0) | (i == totalIter - 1))) {
-      int out = (i + 1.0) / (1.0 * totalIter) * 100 ;
-      Rcpp::Rcout<<out<<"% " ;
-    }
+    if(verbose) pb.increment();
 
     if(i >= (burnin - 1) & (i - burnin + 1) % trim == 0) {
       for(int j = 0 ; j < samples.ncol() ; j++) {
@@ -85,8 +84,6 @@ NumericVector mvtSampler(NumericVector y,
       }
     }
   }
-
-  if(verbose) Rcpp::Rcout<<"\n" ;
 
   return samples ;
 }

@@ -33,8 +33,8 @@ the gradient step size.}
 
 \item{stepCoef}{fixed step size for stochastic gradient.}
 
-\item{verbose}{whether to report the progress of the optimization routine as
-it runs.}
+\item{verbose}{logical; if \code{TRUE} a progress bar from the\cr
+\code{progress} package is shown during optimisation.}
 }
 \value{
 \code{truncNormMLE} returns an object of class \code{truncNormMLE} which

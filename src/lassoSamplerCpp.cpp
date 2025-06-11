@@ -29,8 +29,10 @@
 
 #include <RcppArmadillo.h>
 // [[Rcpp::depends(RcppArmadillo)]]
+// [[Rcpp::depends(RcppProgress)]]
 // [[Rcpp::plugins(cpp11)]]
 // [[Rcpp::plugins(openmp)]]
+#include <progress.hpp>
 #include <omp.h>
 #include <cmath>
 #include <algorithm>
@@ -721,6 +723,8 @@ NumericVector lassoSampler(const NumericVector initEst,
 
   // initializing optimizer
   NumericVector gradient = NumericVector(samp.length()) ;
+  Progress pb(sampMat.nrow(), verbose);
+  int frac = std::max(1, sampMat.nrow() / 20);
 
   for(int optimIter = 0 ; optimIter < sampMat.nrow() ; optimIter ++) {
     // SAMPLING STARTS
@@ -793,10 +797,8 @@ NumericVector lassoSampler(const NumericVector initEst,
     }
 
     // OPTIMIZATION ENDS
-    int frac = floor(sampMat.nrow() / 20) ;
-    if((optimIter + 1) % frac == 0 & verbose) {
-      double percent = round((optimIter + 1.0) / (sampMat.nrow() + 1.0) * 100) ;
-      Rcpp::Rcout<<percent<<"\% " ;
+    if (verbose) pb.increment();
+    if (verbose && (optimIter + 1) % frac == 0) {
       for(int i = 0 ; i < samp.length() ; i ++) {
         samp[i] = naive[i] ;
         signs[i] = sign(naive[i]) ;
@@ -809,8 +811,6 @@ NumericVector lassoSampler(const NumericVector initEst,
       }
     }
   }
-  if(verbose) {
-    Rcpp::Rcout<<"\n" ;
-  }
+
   return samp;
 }

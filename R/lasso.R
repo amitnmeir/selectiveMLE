@@ -35,7 +35,8 @@
 #' @param method optimization method, "selected" is faster than "exact"
 #' but may not converge to the exact MLE. See description for details.
 #'
-#' @param verbose whether to report computation progress
+#' @param verbose logical; if \code{TRUE} a progress bar is shown during
+#'   optimisation and sampling.
 #'
 #' @param multiThread whether to enable OpenMP multi-threading
 #'
